@@ -1,0 +1,6 @@
+{
+  "name": "DataV Workspace",
+  "description": "Unificación de los proyectos datav-s1 y datav-s2 en una sola aplicación.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,449 @@
+import React, { useState, useMemo } from 'react';
+import { 
+  Upload, Target, TrendingUp, Calendar, 
+  CheckCircle2, AlertCircle, RefreshCcw, 
+  Award, ArrowUpRight, BarChart3, Users, DollarSign 
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { 
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, 
+  Cell, ReferenceLine, CartesianGrid, LabelList 
+} from 'recharts';
+import { parseExcelSales } from '../lib/excel-parser';
+import { SaleRecord } from '../types';
+
+function formatQ(amount: number) {
+  return "Q" + amount.toLocaleString('es-GT', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+export default function UnifiedWorkspace() {
+  const [records, setRecords] = useState<SaleRecord[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const [goalInput, setGoalInput] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('Certificado');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+
+  const numGoal = parseFloat(goalInput.replace(/,/g, '')) || 0;
+
+  // Date Logic
+  const today = new Date();
+  const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+  const currentDay = today.getDate();
+  
+  let daysLeft = daysInMonth - currentDay + 1; // Including today initially
+
+  // If the current time is past 8:30 PM, the local is closed, 
+  // so the current day is no longer considered available for selling.
+  const currentHour = today.getHours();
+  const currentMinute = today.getMinutes();
+  
+  if (currentHour > 20 || (currentHour === 20 && currentMinute >= 30)) {
+    daysLeft = Math.max(0, daysLeft - 1);
+  }
+
+  const isStoreClosedToday = (currentHour > 20 || (currentHour === 20 && currentMinute >= 30));
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await parseExcelSales(file);
+      setRecords(data);
+    } catch (err: any) {
+      setError(err.message || 'Error al procesar el archivo');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReset = () => {
+    setRecords(null);
+    setError(null);
+  };
+
+  // Aggregation
+  const sellerStats = useMemo(() => {
+    if (!records) return [];
+    
+    const aggregated: Record<string, number> = {};
+    records.forEach(r => {
+      if (selectedStatus !== 'all' && r.estadoNombre !== selectedStatus) return;
+      
+      if (startDate) {
+        const recordDate = new Date(r.fechaCreacion);
+        if (!isNaN(recordDate.getTime())) {
+          const y = recordDate.getFullYear();
+          const m = String(recordDate.getMonth() + 1).padStart(2, '0');
+          const d = String(recordDate.getDate()).padStart(2, '0');
+          const recordDateStr = `${y}-${m}-${d}`;
+          if (recordDateStr < startDate) return;
+        }
+      }
+
+      if (endDate) {
+        const recordDate = new Date(r.fechaCreacion);
+        if (!isNaN(recordDate.getTime())) {
+          const y = recordDate.getFullYear();
+          const m = String(recordDate.getMonth() + 1).padStart(2, '0');
+          const d = String(recordDate.getDate()).padStart(2, '0');
+          const recordDateStr = `${y}-${m}-${d}`;
+          if (recordDateStr > endDate) return;
+        }
+      }
+
+      const name = r.usuarioVendedorNombre || 'Desconocido';
+      aggregated[name] = (aggregated[name] || 0) + r.total;
+    });
+
+    return Object.entries(aggregated).map(([fullName, sales]) => {
+      const diff = numGoal - sales;
+      const isGoalReached = diff <= 0;
+      const commission = (sales / 1.12) * 0.02;
+      const projectedCommission = (numGoal / 1.12) * 0.02;
+      const dailyRequired = !isGoalReached && daysLeft > 0 ? diff / daysLeft : 0;
+      const progress = numGoal > 0 ? Math.min((sales / numGoal) * 100, 100) : 0;
+      
+      const shortName = fullName.split(' ')[0];
+
+      return { 
+        fullName,
+        shortName, 
+        sales, 
+        diff, 
+        isGoalReached, 
+        commission, 
+        projectedCommission,
+        dailyRequired, 
+        progress 
+      };
+    }).sort((a, b) => b.sales - a.sales);
+  }, [records, numGoal, selectedStatus, startDate, endDate, daysLeft]);
+
+  const totalGlobalSales = useMemo(() => {
+    return sellerStats.reduce((acc, curr) => acc + curr.sales, 0);
+  }, [sellerStats]);
+
+  const highestSeller = sellerStats.length > 0 ? sellerStats[0].shortName : null;
+
+  if (!records) {
+    return (
+      <div className="flex-1 bg-gray-50 flex flex-col items-center justify-center p-4 font-sans text-gray-900">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-lg w-full bg-white shadow-xl shadow-gray-200/50 border border-gray-100 rounded-3xl p-10 text-center"
+        >
+          <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Upload className="w-10 h-10" />
+          </div>
+          <h1 className="text-3xl font-bold mb-3 tracking-tight text-gray-900">DataV Workspace</h1>
+          <p className="text-gray-500 mb-8 text-base leading-relaxed">
+            Sube tu base de datos de ventas (Excel) para combinar las estadísticas de tus vendedores con las metas de comisiones mensuales.
+          </p>
+          
+          <label className="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white py-4 px-8 rounded-2xl font-semibold transition-all shadow-lg shadow-blue-600/30 block mb-4 hover:shadow-blue-600/40 hover:-translate-y-0.5">
+            {loading ? 'Procesando...' : 'Seleccionar Archivo Excel'}
+            <input 
+              type="file" 
+              accept=".xlsx, .xls" 
+              className="hidden" 
+              onChange={handleFileUpload}
+              disabled={loading}
+            />
+          </label>
+          
+          {error && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 bg-red-50 text-red-700 border border-red-100 rounded-2xl text-sm font-medium">
+              {error}
+            </motion.div>
+          )}
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 bg-gray-50 font-sans text-gray-900 flex flex-col">
+      {/* Top Controls Bar */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-40 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-6">
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                <Target className="w-3.5 h-3.5 text-indigo-500" />
+                Meta Global por Vendedor
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">Q</span>
+                <input
+                  type="number"
+                  value={goalInput}
+                  onChange={(e) => setGoalInput(e.target.value)}
+                  className="pl-8 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all w-48"
+                  placeholder="Ej. 350000"
+                />
+              </div>
+            </div>
+
+            <div className="hidden md:block w-px h-10 bg-gray-200"></div>
+
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-orange-500" />
+                Días Restantes
+              </label>
+              <div className="text-lg font-bold text-gray-900 flex items-baseline gap-1">
+                {daysLeft} <span className="text-sm font-medium text-gray-500">de {daysInMonth}</span>
+                {isStoreClosedToday && (
+                  <span className="ml-2 text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md flex items-center gap-1">
+                    Cerrado por hoy
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-3">
+             <div className="flex items-center gap-2">
+               <input 
+                 type="date" 
+                 value={startDate}
+                 onChange={(e) => setStartDate(e.target.value)}
+                 className="border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 hover:bg-gray-100 transition-colors text-gray-700"
+                 title="Fecha Inicial"
+               />
+               <span className="text-gray-400 text-sm">-</span>
+               <input 
+                 type="date" 
+                 value={endDate}
+                 onChange={(e) => setEndDate(e.target.value)}
+                 className="border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 hover:bg-gray-100 transition-colors text-gray-700"
+                 title="Fecha Final"
+               />
+             </div>
+             <select 
+                value={selectedStatus}
+                onChange={(e) => setSelectedStatus(e.target.value)}
+                className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50 hover:bg-gray-100 transition-colors text-gray-700"
+              >
+                <option value="all">Todos los estados</option>
+                <option value="Certificado">Certificado (Válido)</option>
+                <option value="Anulado">Anulado (Inválido)</option>
+                <option value="Pendiente aprobación precios">Pendiente aprobación precios (Inválido)</option>
+                <option value="Emisión">Emisión (Inválido)</option>
+              </select>
+            <button 
+              onClick={handleReset}
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl text-sm font-medium text-gray-700 transition-colors shadow-sm"
+            >
+              <RefreshCcw className="w-4 h-4" />
+              Cambiar Archivo
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full space-y-8">
+        
+        {/* Global Summary & Chart */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 flex flex-col justify-center relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-8 opacity-5">
+              <TrendingUp className="w-32 h-32" />
+            </div>
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                  <BarChart3 className="w-5 h-5" />
+                </div>
+                <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Ventas Totales del Equipo</h3>
+              </div>
+              <p className="text-5xl font-extrabold text-gray-900 tracking-tight">
+                {formatQ(totalGlobalSales)}
+              </p>
+              <div className="mt-4 flex items-center gap-2 text-sm font-medium text-gray-500">
+                <Users className="w-4 h-4" />
+                {sellerStats.length} vendedores activos
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-6 lg:col-span-2">
+            <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-6 flex items-center gap-2">
+              <Award className="w-4 h-4" />
+              Rendimiento vs Meta Global
+            </h3>
+            <div className="h-64 w-full pointer-events-none">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart 
+                  layout="vertical" 
+                  data={sellerStats} 
+                  margin={{ top: 10, right: 100, left: 10, bottom: 20 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} vertical={true} stroke="#f3f4f6" />
+                  <XAxis 
+                    type="number" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 12, fill: '#9ca3af' }} 
+                    tickFormatter={(val) => `Q${(val / 1000)}k`} 
+                  />
+                  <YAxis 
+                    dataKey="shortName" 
+                    type="category" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 13, fill: '#1f2937', fontWeight: 600 }} 
+                    width={100} 
+                  />
+                  {numGoal > 0 && (
+                    <ReferenceLine x={numGoal} stroke="#9ca3af" strokeDasharray="4 4" label={{ position: 'top', value: 'Meta', fill: '#6b7280', fontSize: 12, fontWeight: 600 }} />
+                  )}
+                  <Bar dataKey="sales" barSize={12} radius={[50, 50, 50, 50]} activeBar={false}>
+                    <LabelList 
+                      dataKey="sales" 
+                      position="right" 
+                      formatter={(val: number) => formatQ(val)} 
+                      fill="#4b5563" 
+                      fontSize={12} 
+                      fontWeight={600} 
+                    />
+                    {sellerStats.map((entry, index) => {
+                      const colors = ['#34d399', '#fb923c', '#3b82f6', '#a78bfa', '#f472b6', '#38bdf8', '#facc15', '#fb7185'];
+                      return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                    })}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        {/* Sellers KPI Grid */}
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <Users className="w-6 h-6 text-blue-600" />
+            Análisis de Comisiones por Asesor
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <AnimatePresence>
+              {sellerStats.map((seller, idx) => (
+                <motion.div
+                  key={seller.fullName}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="bg-white rounded-3xl shadow-sm hover:shadow-md transition-shadow border border-gray-100 p-6 flex flex-col"
+                >
+                  <div className="flex justify-between items-start mb-6">
+                    <div>
+                      <h3 className="font-bold text-lg text-gray-900 truncate max-w-[200px]" title={seller.fullName}>
+                        {seller.fullName}
+                      </h3>
+                      <p className="text-sm font-medium text-gray-500 mt-0.5">
+                        {seller.isGoalReached && numGoal > 0 ? '¡Meta superada!' : 'En progreso'}
+                      </p>
+                    </div>
+                    {seller.shortName === highestSeller && seller.sales > 0 && (
+                      <div className="p-2 bg-yellow-50 text-yellow-600 rounded-xl" title="Top Seller">
+                        <Award className="w-5 h-5" />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-5 flex-1">
+                    {/* Sales vs Goal */}
+                    <div>
+                      <div className="flex justify-between items-end mb-2">
+                        <div>
+                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Ventas Actuales</p>
+                          <p className="text-2xl font-extrabold text-gray-900 leading-none mt-1">
+                            {formatQ(seller.sales)}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-gray-900">{seller.progress.toFixed(1)}%</p>
+                        </div>
+                      </div>
+                      <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                        <motion.div 
+                          className={`h-full rounded-full ${seller.isGoalReached ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${seller.progress}%` }}
+                          transition={{ duration: 0.8, ease: "easeOut" }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Commission Stats */}
+                    <div className="grid grid-cols-2 gap-3 bg-gray-50 p-4 rounded-2xl">
+                      <div>
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                          <DollarSign className="w-3 h-3" />
+                          Comisión
+                        </p>
+                        <p className="text-lg font-bold text-emerald-600 mt-0.5">
+                          {formatQ(seller.commission)}
+                        </p>
+                      </div>
+                      <div className="pl-3 border-l border-gray-200">
+                        <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                          Proyectado
+                        </p>
+                        <p className="text-lg font-bold text-gray-900 mt-0.5">
+                          {formatQ(seller.projectedCommission)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Missing / Target Logic */}
+                    <div className="pt-2">
+                      {seller.isGoalReached && numGoal > 0 ? (
+                        <div className="flex items-center gap-3 bg-emerald-50 text-emerald-700 p-3.5 rounded-2xl">
+                          <CheckCircle2 className="w-5 h-5 shrink-0" />
+                          <p className="text-sm font-medium leading-tight">
+                            Excede la meta por <br/><span className="font-bold">{formatQ(Math.abs(seller.diff))}</span>
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="flex items-start gap-3 bg-amber-50 text-amber-800 p-3.5 rounded-2xl">
+                            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-amber-600" />
+                            <div>
+                              <p className="font-bold text-amber-900 leading-none mb-1">
+                                {numGoal > 0 ? `Faltan ${formatQ(seller.diff)}` : 'Sin meta asignada'}
+                              </p>
+                              {numGoal > 0 && <p className="text-xs font-medium opacity-80">para llegar a la meta</p>}
+                            </div>
+                          </div>
+                          
+                          {daysLeft > 0 && numGoal > 0 && (
+                            <div className="flex items-center justify-between px-1">
+                              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                                <ArrowUpRight className="w-3.5 h-3.5" />
+                                Requisito Diario
+                              </span>
+                              <span className="font-bold text-gray-900">
+                                {formatQ(seller.dailyRequired)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
