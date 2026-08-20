@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { 
   Upload, Target, TrendingUp, Calendar, 
   CheckCircle2, AlertCircle, RefreshCcw, 
-  Award, ArrowUpRight, BarChart3, Users, DollarSign 
+  Award, ArrowUpRight, BarChart3, Users, DollarSign,
+  Calculator, X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -26,6 +27,9 @@ export default function UnifiedWorkspace() {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
+  const [simulatingSellers, setSimulatingSellers] = useState<Record<string, boolean>>({});
+  const [simulatedSales, setSimulatedSales] = useState<Record<string, string>>({});
+
   const numGoal = parseFloat(goalInput.replace(/,/g, '')) || 0;
 
   // Date Logic
@@ -45,6 +49,24 @@ export default function UnifiedWorkspace() {
   }
 
   const isStoreClosedToday = (currentHour > 20 || (currentHour === 20 && currentMinute >= 30));
+
+  const handleToggleSimulation = (fullName: string, actualSales: number) => {
+    setSimulatingSellers(prev => {
+      const isSimulating = !prev[fullName];
+      if (!isSimulating) {
+        // Clear value if turning off
+        setSimulatedSales(s => {
+          const newS = { ...s };
+          delete newS[fullName];
+          return newS;
+        });
+      } else {
+        // Initialize with actual sales
+        setSimulatedSales(s => ({ ...s, [fullName]: actualSales.toString() }));
+      }
+      return { ...prev, [fullName]: isSimulating };
+    });
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -101,7 +123,14 @@ export default function UnifiedWorkspace() {
       aggregated[name] = (aggregated[name] || 0) + r.total;
     });
 
-    return Object.entries(aggregated).map(([fullName, sales]) => {
+    return Object.entries(aggregated).map(([fullName, actualSales]) => {
+      const isSimulating = simulatingSellers[fullName] || false;
+      const rawSimulated = simulatedSales[fullName];
+      
+      const sales = isSimulating 
+        ? (parseFloat((rawSimulated || '').toString().replace(/,/g, '')) || 0) 
+        : actualSales;
+
       const diff = numGoal - sales;
       const isGoalReached = diff <= 0;
       const netSales = sales / 1.12;
@@ -117,7 +146,9 @@ export default function UnifiedWorkspace() {
       return { 
         fullName,
         shortName, 
+        actualSales,
         sales, 
+        isSimulating,
         netSales,
         diff, 
         netDiff,
@@ -129,10 +160,10 @@ export default function UnifiedWorkspace() {
         netProgress
       };
     }).sort((a, b) => b.sales - a.sales);
-  }, [records, numGoal, selectedStatus, startDate, endDate, daysLeft]);
+  }, [records, numGoal, selectedStatus, startDate, endDate, daysLeft, simulatingSellers, simulatedSales]);
 
   const totalGlobalSales = useMemo(() => {
-    return sellerStats.reduce((acc, curr) => acc + curr.sales, 0);
+    return sellerStats.reduce((acc, curr) => acc + curr.actualSales, 0);
   }, [sellerStats]);
 
   const highestSeller = sellerStats.length > 0 ? sellerStats[0].shortName : null;
@@ -345,7 +376,7 @@ export default function UnifiedWorkspace() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: idx * 0.05 }}
-                  className="bg-white rounded-3xl shadow-sm hover:shadow-md transition-shadow border border-gray-100 p-6 flex flex-col"
+                  className={`bg-white rounded-3xl shadow-sm hover:shadow-md transition-all border p-6 flex flex-col ${seller.isSimulating ? 'border-indigo-300 ring-4 ring-indigo-50' : 'border-gray-100'}`}
                 >
                   <div className="flex justify-between items-start mb-6">
                     <div>
@@ -368,10 +399,36 @@ export default function UnifiedWorkspace() {
                     <div>
                       <div className="flex justify-between items-end mb-2">
                         <div>
-                          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Ventas Actuales</p>
-                          <p className="text-2xl font-extrabold text-gray-900 leading-none mt-1">
-                            {formatQ(seller.sales)}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">
+                              {seller.isSimulating ? 'Simulador Activo' : 'Ventas Actuales'}
+                            </p>
+                            <button 
+                              onClick={() => handleToggleSimulation(seller.fullName, seller.actualSales)}
+                              className={`p-1 rounded-md transition-colors ${seller.isSimulating ? 'bg-indigo-100 text-indigo-600' : 'hover:bg-gray-100 text-gray-400 hover:text-gray-700'}`}
+                              title={seller.isSimulating ? 'Cerrar simulador' : 'Simular proyección'}
+                            >
+                              {seller.isSimulating ? <X className="w-3.5 h-3.5" /> : <Calculator className="w-3.5 h-3.5" />}
+                            </button>
+                          </div>
+                          
+                          {seller.isSimulating ? (
+                            <div className="mt-1 relative">
+                              <span className="absolute left-0 top-1/2 -translate-y-1/2 text-gray-500 font-bold">Q</span>
+                              <input 
+                                type="text"
+                                className="w-32 bg-transparent text-2xl font-extrabold text-indigo-600 leading-none outline-none border-b-2 border-indigo-200 focus:border-indigo-500 pl-4 py-0.5"
+                                value={simulatedSales[seller.fullName] || ''}
+                                onChange={(e) => setSimulatedSales(s => ({ ...s, [seller.fullName]: e.target.value }))}
+                                placeholder="0.00"
+                              />
+                            </div>
+                          ) : (
+                            <p className="text-2xl font-extrabold text-gray-900 leading-none mt-1">
+                              {formatQ(seller.sales)}
+                            </p>
+                          )}
+
                           <p className="text-xs font-medium text-gray-500 mt-1.5 flex items-center gap-1" title="Venta real limpios de IVA">
                             Sin IVA: <span className="font-bold text-gray-700">{formatQ(seller.netSales)}</span>
                           </p>
