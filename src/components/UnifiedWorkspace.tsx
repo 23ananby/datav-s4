@@ -105,6 +105,8 @@ export default function UnifiedWorkspace() {
       const diff = numGoal - sales;
       const isGoalReached = diff <= 0;
       const netSales = sales / 1.12;
+      const netDiff = numGoal - netSales;
+      const netProgress = numGoal > 0 ? Math.min((netSales / numGoal) * 100, 100) : 0;
       const commission = netSales * 0.02;
       const projectedCommission = (numGoal / 1.12) * 0.02;
       const dailyRequired = !isGoalReached && daysLeft > 0 ? diff / daysLeft : 0;
@@ -118,11 +120,13 @@ export default function UnifiedWorkspace() {
         sales, 
         netSales,
         diff, 
+        netDiff,
         isGoalReached, 
         commission, 
         projectedCommission,
         dailyRequired, 
-        progress 
+        progress,
+        netProgress
       };
     }).sort((a, b) => b.sales - a.sales);
   }, [records, numGoal, selectedStatus, startDate, endDate, daysLeft]);
@@ -373,15 +377,24 @@ export default function UnifiedWorkspace() {
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm font-bold text-gray-900">{seller.progress.toFixed(1)}%</p>
+                          <p className="text-sm font-bold text-gray-900">{seller.progress.toFixed(1)}% <span className="text-[10px] text-gray-500 font-medium ml-0.5 uppercase">bruto</span></p>
+                          <p className="text-sm font-bold text-blue-600 mt-1">{seller.netProgress.toFixed(1)}% <span className="text-[10px] text-blue-400 font-medium ml-0.5 uppercase">sin IVA</span></p>
                         </div>
                       </div>
-                      <div className="h-2.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                      <div className="relative h-3 w-full bg-gray-100 rounded-full overflow-hidden flex items-center">
+                        {/* Gross Progress (Background Bar) */}
                         <motion.div 
-                          className={`h-full rounded-full ${seller.isGoalReached ? 'bg-emerald-500' : 'bg-blue-500'}`}
+                          className={`absolute left-0 h-full rounded-full ${seller.isGoalReached ? 'bg-emerald-200' : 'bg-blue-200'}`}
                           initial={{ width: 0 }}
                           animate={{ width: `${seller.progress}%` }}
                           transition={{ duration: 0.8, ease: "easeOut" }}
+                        />
+                        {/* Net Progress (Inner Thin Line) */}
+                        <motion.div 
+                          className={`absolute left-0 h-1.5 rounded-full mx-0.5 ${seller.isGoalReached ? 'bg-emerald-500' : 'bg-blue-600'}`}
+                          initial={{ width: 0 }}
+                          animate={{ width: `calc(${seller.netProgress}% - 4px)` }}
+                          transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
                         />
                       </div>
                     </div>
@@ -410,11 +423,16 @@ export default function UnifiedWorkspace() {
                     {/* Missing / Target Logic */}
                     <div className="pt-2">
                       {seller.isGoalReached && numGoal > 0 ? (
-                        <div className="flex items-center gap-3 bg-emerald-50 text-emerald-700 p-3.5 rounded-2xl">
-                          <CheckCircle2 className="w-5 h-5 shrink-0" />
-                          <p className="text-sm font-medium leading-tight">
-                            Excede la meta por <br/><span className="font-bold">{formatQ(Math.abs(seller.diff))}</span>
-                          </p>
+                        <div className="flex items-start gap-3 bg-emerald-50 text-emerald-700 p-3.5 rounded-2xl">
+                          <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium leading-tight">
+                              Excede la meta por <br/><span className="font-bold text-base">{formatQ(Math.abs(seller.diff))}</span>
+                            </p>
+                            <p className="text-[11px] font-bold text-emerald-600 mt-1 flex items-center gap-1 uppercase tracking-wider">
+                              Sin IVA: <span className="font-extrabold">{formatQ(Math.abs(seller.netDiff))}</span>
+                            </p>
+                          </div>
                         </div>
                       ) : (
                         <div className="space-y-3">
@@ -424,7 +442,14 @@ export default function UnifiedWorkspace() {
                               <p className="font-bold text-amber-900 leading-none mb-1">
                                 {numGoal > 0 ? `Faltan ${formatQ(seller.diff)}` : 'Sin meta asignada'}
                               </p>
-                              {numGoal > 0 && <p className="text-xs font-medium opacity-80">para llegar a la meta</p>}
+                              {numGoal > 0 && (
+                                <>
+                                  <p className="text-[11px] font-bold text-amber-700 mt-1.5 flex items-center gap-1 uppercase tracking-wider">
+                                    Sin IVA: <span className="font-extrabold">{formatQ(seller.netDiff)}</span>
+                                  </p>
+                                  <p className="text-[10px] font-medium opacity-80 mt-0.5">para llegar a la meta</p>
+                                </>
+                              )}
                             </div>
                           </div>
                           
