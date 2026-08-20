@@ -104,7 +104,8 @@ export default function UnifiedWorkspace() {
     return Object.entries(aggregated).map(([fullName, sales]) => {
       const diff = numGoal - sales;
       const isGoalReached = diff <= 0;
-      const commission = (sales / 1.12) * 0.02;
+      const netSales = sales / 1.12;
+      const commission = netSales * 0.02;
       const projectedCommission = (numGoal / 1.12) * 0.02;
       const dailyRequired = !isGoalReached && daysLeft > 0 ? diff / daysLeft : 0;
       const progress = numGoal > 0 ? Math.min((sales / numGoal) * 100, 100) : 0;
@@ -115,6 +116,7 @@ export default function UnifiedWorkspace() {
         fullName,
         shortName, 
         sales, 
+        netSales,
         diff, 
         isGoalReached, 
         commission, 
@@ -365,6 +367,9 @@ export default function UnifiedWorkspace() {
                           <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Ventas Actuales</p>
                           <p className="text-2xl font-extrabold text-gray-900 leading-none mt-1">
                             {formatQ(seller.sales)}
+                          </p>
+                          <p className="text-xs font-medium text-gray-500 mt-1.5 flex items-center gap-1" title="Venta real limpios de IVA">
+                            Sin IVA: <span className="font-bold text-gray-700">{formatQ(seller.netSales)}</span>
                           </p>
                         </div>
                         <div className="text-right">
