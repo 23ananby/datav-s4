@@ -29,6 +29,9 @@ export default function UnifiedWorkspace() {
 
   const [simulatingSellers, setSimulatingSellers] = useState<Record<string, boolean>>({});
   const [simulatedSales, setSimulatedSales] = useState<Record<string, string>>({});
+  
+  const [isSimulatingDays, setIsSimulatingDays] = useState<boolean>(false);
+  const [simulatedDays, setSimulatedDays] = useState<string>('');
 
   const numGoal = parseFloat(goalInput.replace(/,/g, '')) || 0;
 
@@ -37,7 +40,7 @@ export default function UnifiedWorkspace() {
   const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
   const currentDay = today.getDate();
   
-  let daysLeft = daysInMonth - currentDay + 1; // Including today initially
+  let actualDaysLeft = daysInMonth - currentDay + 1; // Including today initially
 
   // If the current time is past 8:30 PM, the local is closed, 
   // so the current day is no longer considered available for selling.
@@ -45,8 +48,10 @@ export default function UnifiedWorkspace() {
   const currentMinute = today.getMinutes();
   
   if (currentHour > 20 || (currentHour === 20 && currentMinute >= 30)) {
-    daysLeft = Math.max(0, daysLeft - 1);
+    actualDaysLeft = Math.max(0, actualDaysLeft - 1);
   }
+
+  const daysLeft = isSimulatingDays ? (parseInt(simulatedDays) || 0) : actualDaysLeft;
 
   const isStoreClosedToday = (currentHour > 20 || (currentHour === 20 && currentMinute >= 30));
 
@@ -231,13 +236,36 @@ export default function UnifiedWorkspace() {
             <div className="hidden md:block w-px h-10 bg-gray-200"></div>
 
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1 flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-orange-500" />
-                Días Restantes
-              </label>
+              <div className="flex items-center gap-2 mb-1">
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <Calendar className="w-3.5 h-3.5 text-orange-500" />
+                  {isSimulatingDays ? 'Simulador de Días' : 'Días Restantes'}
+                </label>
+                <button 
+                  onClick={() => {
+                    setIsSimulatingDays(!isSimulatingDays);
+                    if (!isSimulatingDays) setSimulatedDays(daysLeft.toString());
+                  }}
+                  className={`p-1 rounded-md transition-colors ${isSimulatingDays ? 'bg-indigo-100 text-indigo-600' : 'hover:bg-gray-100 text-gray-400 hover:text-gray-700'}`}
+                  title={isSimulatingDays ? 'Cerrar simulador de días' : 'Simular días restantes'}
+                >
+                  {isSimulatingDays ? <X className="w-3.5 h-3.5" /> : <Calculator className="w-3.5 h-3.5" />}
+                </button>
+              </div>
               <div className="text-lg font-bold text-gray-900 flex items-baseline gap-1">
-                {daysLeft} <span className="text-sm font-medium text-gray-500">de {daysInMonth}</span>
-                {isStoreClosedToday && (
+                {isSimulatingDays ? (
+                  <input
+                    type="number"
+                    value={simulatedDays}
+                    onChange={(e) => setSimulatedDays(e.target.value)}
+                    className="w-16 bg-transparent text-lg font-extrabold text-indigo-600 leading-none outline-none border-b-2 border-indigo-200 focus:border-indigo-500 py-0.5"
+                    min="0"
+                  />
+                ) : (
+                  daysLeft
+                )}
+                {!isSimulatingDays && <span className="text-sm font-medium text-gray-500">de {daysInMonth}</span>}
+                {isStoreClosedToday && !isSimulatingDays && (
                   <span className="ml-2 text-xs font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-md flex items-center gap-1">
                     Cerrado por hoy
                   </span>
