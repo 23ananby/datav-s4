@@ -146,6 +146,10 @@ export default function UnifiedWorkspace() {
       const dailyRequired = !isGoalReached && daysLeft > 0 ? diff / daysLeft : 0;
       const progress = numGoal > 0 ? Math.min((sales / numGoal) * 100, 100) : 0;
       
+      const grossTargetForNetGoal = numGoal * 1.12;
+      const diffForNetGoal = grossTargetForNetGoal - sales;
+      const isNetGoalReached = diffForNetGoal <= 0;
+      
       const shortName = fullName.split(' ')[0];
 
       return { 
@@ -162,7 +166,10 @@ export default function UnifiedWorkspace() {
         projectedCommission,
         dailyRequired, 
         progress,
-        netProgress
+        netProgress,
+        grossTargetForNetGoal,
+        diffForNetGoal,
+        isNetGoalReached
       };
     }).sort((a, b) => b.sales - a.sales);
   }, [records, numGoal, selectedStatus, startDate, endDate, daysLeft, simulatingSellers, simulatedSales]);
@@ -552,6 +559,34 @@ export default function UnifiedWorkspace() {
                         </div>
                       )}
                     </div>
+
+                    {/* Meta equivalente libre de IVA */}
+                    {numGoal > 0 && (
+                      <div className="mt-4 pt-4 border-t border-gray-100">
+                        <div className="flex items-start gap-2 bg-indigo-50/50 p-3.5 rounded-xl border border-indigo-50/80">
+                          <Target className="w-4 h-4 text-indigo-500 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-[11px] font-bold text-indigo-800 uppercase tracking-wider mb-1 leading-tight">
+                              Proyección Libre de IVA
+                            </p>
+                            <p className="text-xs text-indigo-700/90 leading-snug">
+                              Para lograr <span className="font-bold text-indigo-900">{formatQ(numGoal)}</span> limpios de IVA, debes alcanzar <span className="font-bold text-indigo-900">{formatQ(seller.grossTargetForNetGoal)}</span> brutos.
+                            </p>
+                            
+                            {!seller.isNetGoalReached ? (
+                              <p className="text-[11px] font-bold text-indigo-600 mt-2 bg-indigo-100/50 inline-flex px-2 py-1 rounded-md items-center gap-1">
+                                Faltan brutos: <span className="font-extrabold text-indigo-700">{formatQ(seller.diffForNetGoal)}</span>
+                              </p>
+                            ) : (
+                              <p className="text-[11px] font-bold text-emerald-700 mt-2 bg-emerald-100/50 inline-flex px-2 py-1 rounded-md items-center gap-1">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                ¡Meta libre de IVA alcanzada!
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               ))}
