@@ -149,6 +149,7 @@ export default function UnifiedWorkspace() {
       const grossTargetForNetGoal = numGoal * 1.12;
       const diffForNetGoal = grossTargetForNetGoal - sales;
       const isNetGoalReached = diffForNetGoal <= 0;
+      const dailyRequiredForNetGoal = !isNetGoalReached && daysLeft > 0 ? diffForNetGoal / daysLeft : 0;
       
       const shortName = fullName.split(' ')[0];
 
@@ -165,6 +166,7 @@ export default function UnifiedWorkspace() {
         commission, 
         projectedCommission,
         dailyRequired, 
+        dailyRequiredForNetGoal,
         progress,
         netProgress,
         grossTargetForNetGoal,
@@ -546,14 +548,25 @@ export default function UnifiedWorkspace() {
                           </div>
                           
                           {daysLeft > 0 && numGoal > 0 && (
-                            <div className="flex items-center justify-between px-1">
-                              <span className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
-                                <ArrowUpRight className="w-3.5 h-3.5" />
-                                Requisito Diario
-                              </span>
-                              <span className="font-bold text-gray-900">
-                                {formatQ(seller.dailyRequired)}
-                              </span>
+                            <div className="space-y-2 px-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                                  <ArrowUpRight className="w-3.5 h-3.5" />
+                                  Requisito Diario
+                                </span>
+                                <span className="font-bold text-gray-900">
+                                  {formatQ(seller.dailyRequired)}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between border-t border-gray-100 pt-2">
+                                <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wider flex items-center gap-1">
+                                  <ArrowUpRight className="w-3 h-3" />
+                                  Req. Diario (Sin IVA)
+                                </span>
+                                <span className="font-bold text-indigo-700 text-sm">
+                                  {formatQ(seller.dailyRequiredForNetGoal)}
+                                </span>
+                              </div>
                             </div>
                           )}
                         </div>
