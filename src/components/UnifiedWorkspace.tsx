@@ -587,9 +587,17 @@ export default function UnifiedWorkspace() {
                             </p>
                             
                             {!seller.isNetGoalReached ? (
-                              <p className="text-[11px] font-bold text-indigo-600 mt-2 bg-indigo-100/50 inline-flex px-2 py-1 rounded-md items-center gap-1">
-                                Faltan brutos: <span className="font-extrabold text-indigo-700">{formatQ(seller.diffForNetGoal)}</span>
-                              </p>
+                              <div className="mt-2 flex flex-col gap-1 items-start">
+                                <p className="text-[11px] font-bold text-indigo-600 bg-indigo-100/50 inline-flex px-2 py-1 rounded-md items-center gap-1">
+                                  Faltan brutos: <span className="font-extrabold text-indigo-700">{formatQ(seller.diffForNetGoal)}</span>
+                                </p>
+                                {daysLeft > 0 && (
+                                  <p className="text-[10px] font-medium text-indigo-500/90 pl-1 flex items-center gap-1">
+                                    <ArrowUpRight className="w-3 h-3" />
+                                    Req. diario bruto: <span className="font-bold text-indigo-600">{formatQ(seller.dailyRequiredForNetGoal)}</span>
+                                  </p>
+                                )}
+                              </div>
                             ) : (
                               <p className="text-[11px] font-bold text-emerald-700 mt-2 bg-emerald-100/50 inline-flex px-2 py-1 rounded-md items-center gap-1">
                                 <CheckCircle2 className="w-3.5 h-3.5" />
