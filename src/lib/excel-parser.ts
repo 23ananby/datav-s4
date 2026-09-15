@@ -3,6 +3,7 @@ import { parse } from 'date-fns';
 import { SaleRecord } from '../types';
 
 // Expected column names
+const COL_ID_VENTA = "Id Venta";
 const COL_FECHA = "Fecha Creacion";
 const COL_TOTAL = "Total";
 const COL_ESTADO = "Estado Nombre";
@@ -37,13 +38,14 @@ export function parseExcelSales(file: File): Promise<SaleRecord[]> {
         const headers = rawData[1];
 
         // Find indexes of the columns we care about
+        const idVentaIdx = headers.findIndex((h) => typeof h === 'string' && h.trim() === COL_ID_VENTA);
         const fechaIdx = headers.findIndex((h) => typeof h === 'string' && h.trim() === COL_FECHA);
         const totalIdx = headers.findIndex((h) => typeof h === 'string' && h.trim() === COL_TOTAL);
         const estadoIdx = headers.findIndex((h) => typeof h === 'string' && h.trim() === COL_ESTADO);
         const usuarioIdx = headers.findIndex((h) => typeof h === 'string' && h.trim() === COL_USUARIO);
 
-        if (fechaIdx === -1 || totalIdx === -1 || estadoIdx === -1 || usuarioIdx === -1) {
-          throw new Error("No se encontraron todas las columnas requeridas (Fecha Creacion, Total, Estado Nombre, Usuario Vendedor Nombre).");
+        if (idVentaIdx === -1 || fechaIdx === -1 || totalIdx === -1 || estadoIdx === -1 || usuarioIdx === -1) {
+          throw new Error("No se encontraron todas las columnas requeridas (Id Venta, Fecha Creacion, Total, Estado Nombre, Usuario Vendedor Nombre).");
         }
 
         const records: SaleRecord[] = [];
@@ -53,14 +55,15 @@ export function parseExcelSales(file: File): Promise<SaleRecord[]> {
           const row = rawData[i];
           if (!row || row.length === 0) continue; // Skip empty rows
 
-          // Extract only the 4 required columns, ignoring everything else
+          // Extract only the 5 required columns, ignoring everything else
+          const rawIdVenta = row[idVentaIdx];
           const rawFecha = row[fechaIdx];
           const rawTotal = row[totalIdx];
           const rawEstado = row[estadoIdx];
           const rawUsuario = row[usuarioIdx];
 
           // Skip if all are undefined (empty row)
-          if (rawFecha === undefined && rawTotal === undefined && rawEstado === undefined && rawUsuario === undefined) {
+          if (rawIdVenta === undefined && rawFecha === undefined && rawTotal === undefined && rawEstado === undefined && rawUsuario === undefined) {
             continue;
           }
 
@@ -92,6 +95,7 @@ export function parseExcelSales(file: File): Promise<SaleRecord[]> {
           const parsedTotal = parseFloat(String(rawTotal).replace(/[^0-9.-]+/g,""));
 
           records.push({
+            idVenta: rawIdVenta !== undefined ? String(rawIdVenta).trim() : undefined,
             fechaCreacion: isNaN(fechaObj.getTime()) ? new Date(0) : fechaObj,
             total: isNaN(parsedTotal) ? 0 : parsedTotal,
             estadoNombre: typeof rawEstado === 'string' ? rawEstado.trim() : String(rawEstado || ''),

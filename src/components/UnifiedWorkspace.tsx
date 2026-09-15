@@ -98,7 +98,7 @@ export default function UnifiedWorkspace() {
   const sellerStats = useMemo(() => {
     if (!records) return [];
     
-    const aggregated: Record<string, number> = {};
+    const aggregated: Record<string, { total: number; count: number; saleIds: string[] }> = {};
     records.forEach(r => {
       if (selectedStatus !== 'all' && r.estadoNombre !== selectedStatus) return;
       
@@ -125,10 +125,21 @@ export default function UnifiedWorkspace() {
       }
 
       const name = r.usuarioVendedorNombre || 'Desconocido';
-      aggregated[name] = (aggregated[name] || 0) + r.total;
+      if (!aggregated[name]) {
+        aggregated[name] = { total: 0, count: 0, saleIds: [] };
+      }
+      aggregated[name].total += r.total;
+      aggregated[name].count += 1;
+      if (r.idVenta) {
+        aggregated[name].saleIds.push(r.idVenta);
+      }
     });
 
-    return Object.entries(aggregated).map(([fullName, actualSales]) => {
+    return Object.entries(aggregated).map(([fullName, data]) => {
+      const actualSales = data.total;
+      const salesCount = data.count;
+      const saleIds = data.saleIds;
+
       const isSimulating = simulatingSellers[fullName] || false;
       const rawSimulated = simulatedSales[fullName];
       
@@ -157,6 +168,8 @@ export default function UnifiedWorkspace() {
         fullName,
         shortName, 
         actualSales,
+        salesCount,
+        saleIds,
         sales, 
         isSimulating,
         netSales,
@@ -469,6 +482,29 @@ export default function UnifiedWorkspace() {
                           <p className="text-xs font-medium text-gray-500 mt-1.5 flex items-center gap-1" title="Venta real limpios de IVA">
                             Sin IVA: <span className="font-bold text-gray-700">{formatQ(seller.netSales)}</span>
                           </p>
+                          <div className="mt-2">
+                            <details className="group">
+                              <summary className="text-[11px] font-bold text-blue-600 uppercase tracking-wider cursor-pointer list-none flex items-center gap-1 hover:text-blue-700 transition-colors">
+                                <svg className="w-3 h-3 transition-transform group-open:rotate-90" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                                {seller.salesCount} venta{seller.salesCount !== 1 ? 's' : ''}
+                              </summary>
+                              <div className="mt-1.5 pl-4 max-h-24 overflow-y-auto scrollbar-thin scrollbar-thumb-gray-200">
+                                {seller.saleIds.length > 0 ? (
+                                  <ul className="flex flex-wrap gap-1">
+                                    {seller.saleIds.map((id, i) => (
+                                      <li key={i} className="text-[10px] font-mono bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded border border-blue-100">
+                                        {id}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : (
+                                  <p className="text-[10px] text-gray-400 italic">Sin IDs registrados</p>
+                                )}
+                              </div>
+                            </details>
+                          </div>
                         </div>
                         <div className="text-right">
                           <p className="text-sm font-bold text-gray-900">{seller.progress.toFixed(1)}% <span className="text-[10px] text-gray-500 font-medium ml-0.5 uppercase">bruto</span></p>
